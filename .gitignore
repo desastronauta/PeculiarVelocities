@@ -2,5 +2,5 @@
 *.slurm
 *.h5
 *.txt
-./emcee/fsig8/CAMB_orig
+emcee/fsig8/CAMB_orig/
 __pycache__/
