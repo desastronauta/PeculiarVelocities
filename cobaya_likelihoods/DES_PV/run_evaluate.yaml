@@ -1,7 +1,7 @@
 stop_at_error: True
 
 likelihood:
-  DES_semSH0ES:
+  DES_PV:
 
 theory:
   camb:

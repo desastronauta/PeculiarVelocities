@@ -15,11 +15,13 @@ import sne_functions as sne
 ndim = 4 ; nwalkers = 60 ; nsteps=50000 ; save_interval = 10000
 path_savefile = "/share/storage3/bets/camilo_storage3/Pantheon/"
 
-# savefilename = 'emcee_onlyDESI_RSD.h5'
-# extrapoint = {'z':0.07, 'fsig8':0.4497, 'fsig8_err':0.055, 'tracer':'BGS+PV'}
+# savefilename = 'emcee_onlyDESI_nolowz.h5'
 
-savefilename = 'emcee_onlyDESI_Pan.h5'
-extrapoint = {'z':0.024, 'fsig8':0.31, 'fsig8_err':0.19, 'tracer':'Pantheon+'}
+savefilename = 'emcee_onlyDESI_RSD.h5'
+extrapoint = {'z':0.07, 'fsig8':0.4497, 'fsig8_err':0.055, 'tracer':'BGS+PV'}
+
+# savefilename = 'emcee_onlyDESI_Pan.h5'
+# extrapoint = {'z':0.024, 'fsig8':0.31, 'fsig8_err':0.19, 'tracer':'Pantheon+'}
 
 # Define data NOTE: the first point comes from PVs (Pantheon+, DESY5, DESI BGS+PV)
 
@@ -27,6 +29,12 @@ fs8_data = {'z':[extrapoint['z'],0.295,0.510,0.706,0.930,1.317,1.491],
         'fsig8':[extrapoint['fsig8'],0.378,0.516,0.484,0.422,0.375,0.435], 
         'fsig8_err':[extrapoint['fsig8_err'],0.094,0.061,0.055,0.048,0.043,0.045],
         'tracer':['BGS+PV','BGS','LRG1','LRG2','LRG3','ELG2','QSO']}
+
+# fs8_data = {'z':[0.295,0.510,0.706,0.930,1.317,1.491],
+#         'fsig8':[0.378,0.516,0.484,0.422,0.375,0.435], 
+#         'fsig8_err':[0.094,0.061,0.055,0.048,0.043,0.045],
+#         'tracer':['BGS','LRG1','LRG2','LRG3','ELG2','QSO']}
+
 
 def compute_fsigma8(theta_fs8, redshifts=fs8_data['z']):
     Om, Ok, sig8, gamma = theta_fs8
@@ -80,7 +88,7 @@ def logprior(theta_fs8):
     if not (0<OL<1)         : return -np.inf
     if not (0<Om<1.5)       : return -np.inf 
     if not (0<sig8<2)       : return -np.inf
-    if not (0<gamma<3)     : return -np.inf
+    if not (0<gamma<3)      : return -np.inf
     return 0
 
 def logprob(theta):

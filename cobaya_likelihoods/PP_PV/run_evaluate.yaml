@@ -1,7 +1,7 @@
 stop_at_error: True
 
 likelihood:
-  PP_semSH0ES:
+  PP_PV:
 
 theory:
   camb:

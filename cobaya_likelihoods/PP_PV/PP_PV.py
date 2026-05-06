@@ -1,7 +1,7 @@
 """
-.. module:: likelihoods.mylike2
+.. module:: likelihoods.mylike
 
-:Synopsis: SNe Ia DES likelihood with peculiar velocity covariance matrix
+:Synopsis: SNe Ia Pantheon+ likelihood with peculiar velocity covariance matrix
 :Author: Joao Reboucas & Camilo Crisman
 
 """
@@ -9,23 +9,20 @@
 import numpy as np
 # Local
 from cobaya.likelihood import Likelihood
-import pandas as pd
 from scipy.integrate import trapezoid
 from scipy.interpolate import interp1d, InterpolatedUnivariateSpline
-import os, h5py
-from astropy.io import fits
 
 # SNe Functions
 c = 299792.458 # [km/s]
-nmod = 243
+nmod = 628
 
-class DES_semSH0ES(Likelihood):
-    file_base_name = 'DES_semSH0ES'
+class PP_PV(Likelihood):
+    file_base_name = 'PP_PV'
 
     def initialize(self):
         self.log.info("Initializing")
         super().initialize()
-        self.mvecc, self.zvec_CMB, self.zvec_HEL, self.rdirs, self.cov_pan_fil = DESY5_data()
+        self.mvecc, self.zvec_CMB, self.zvec_HEL, self.rdirs, self.cov_pan_fil = Pantheon_data()
         self._input_params_order = self.input_params
         self.provides = []
         self.output_params = []
@@ -142,17 +139,17 @@ class DES_semSH0ES(Likelihood):
         return ctest
 
 
-def Hub(h0,Om, OL,z):
+def Hub(,Om, OL,z):
     Ok = 1 - Om - OL
-    return h0*100*np.sqrt( Om*(1+z)**3 + OL + Ok*(1+z)*(1+z) )/c
+    return h*100*np.sqrt( Om*(1+z)**3 + OL + Ok*(1+z)*(1+z) )/c
 
 def K_par(x):
     return np.sin(x)/x - 2 * (np.sin(x)/x/x - np.cos(x)/x) /x
 def K_per(x):
     return (np.sin(x)/x/x - np.cos(x)/x)/x
 
-def f(h0,Om, OL,gamma,z):
-    Omz = Om*(1+z)**3 *(h0*100/c/Hub(h0,Om, OL,z))**2
+def f(h,Om, OL,gamma,z):
+    Omz = Om*(1+z)**3 *(h*100/c/Hub(h,Om, OL,z))**2
     return ( Omz )**(gamma)
 
 # Define the function to calculate the growth factor and its derivative
@@ -165,111 +162,60 @@ def get_growth_function_derivative(results, z_values):
     return G_interp#, G_der_tau
 
 
-def DESY5_data():
-    data_dir = '/share/storage3/bets/camilo_storage3/DES'
-    file_name = 'DES-SN5YR_HD+MetaData.csv'
-    file_path = os.path.join(data_dir, file_name)
-    data = pd.read_csv(file_path)
-    mB_DES = data['mB_corr'].to_numpy()
-    zCMB_DES = data['zCMB'].to_numpy()
-    zHEL_DES = data['zHEL'].to_numpy()
-    MUERR_DES = data['MUERR_FINAL'].to_numpy()
 
-    RA_DES = data['HOST_RA'].to_numpy()
-    DEC_DES = data['HOST_DEC'].to_numpy()
+def Pantheon_data():
+    """
+        Extracts information from Pantheon data
+    """
+    dtype = {
+    'names': ('CID', 'IDSURVEY', 'zHD', 'zHDERR', 'zCMB', 'zCMBERR', 'zHEL',
+              'zHELERR', 'm_b_corr', 'm_b_corr_err_DIAG', 'MU_SH0ES',
+              'MU_SH0ES_ERR_DIAG', 'CEPH_DIST', 'IS_CALIBRATOR',
+              'USED_IN_SH0ES_HF', 'c', 'cERR', 'x1', 'x1ERR', 'mB', 'mBERR',
+              'x0', 'x0ERR', 'COV_x1_c', 'COV_x1_x0', 'COV_c_x0', 'RA', 'DEC',
+              'HOST_RA', 'HOST_DEC', 'HOST_ANGSEP', 'VPEC', 'VPECERR', 'MWEBV',
+              'HOST_LOGMASS', 'HOST_LOGMASS_ERR', 'PKMJD', 'PKMJDERR', 'NDOF',
+              'FITCHI2', 'FITPROB', 'm_b_corr_err_RAW', 'm_b_corr_err_VPEC',
+              'biasCor_m_b', 'biasCorErr_m_b', 'biasCor_m_b_COVSCALE',
+              'biasCor_m_b_COVADD'),
+    'formats': ['U10'] + ['f8']*46  # 'U10' for the first 'string' column, 'f8' for the numeric columns
+    }
 
-    diagonal_matrix = np.diag(MUERR_DES)
+    file_path = "/share/storage3/bets/camilo_storage3/Pantheon/Pantheon+SH0ES.dat" # TODO: maybe point to pp.dat
+    # file_path = "/home/joaoreboucas/cocoa/Cocoa/cobaya/cobaya/likelihoods/mylike/data/pp.dat"
+    data = np.genfromtxt(file_path, skip_header=1, dtype=dtype)
 
-    cov_name = 'STAT+SYS.txt.gz'
-    cov_path = os.path.join(data_dir, cov_name)
-    covvec = pd.read_csv(cov_path)
-    mat_size = int(np.sqrt(len(covvec)))
-    cov_mat = np.reshape(covvec.to_numpy(), (mat_size, mat_size))
-    cov_mat_DES = cov_mat + diagonal_matrix**2
+    file_path = "/share/storage3/bets/camilo_storage3/Pantheon/Pantheon+SH0ES_STAT+SYS.cov" # TODO: maybe point to pp.cov
+    # file_path = "/home/joaoreboucas/cocoa/Cocoa/cobaya/cobaya/likelihoods/mylike/data/pp.cov"
+    cov_vec = np.loadtxt(file_path, delimiter=' ') 
+    matrix_size = int(np.sqrt(len(cov_vec[1:])))
+    cov_matrix = np.reshape(cov_vec[1:], (matrix_size, matrix_size))
 
-    # Abre el archivo
-    with fits.open(os.path.join(data_dir, "DES-SN5YR_LOWZ_HEAD.FITS.gz")) as hdul:
-        #hdul.info()  # Revisa las extensiones disponibles
-        table_data = hdul[1].data  # Generalmente, la tabla estÃ¡ en la extensiÃ³n 1
-    df_lowz = pd.DataFrame(table_data)
+    zvec = data['zCMB'].T
+    zHEL = data['zHEL'].T
+    mvec = data['m_b_corr'].T
+    RA = data['RA'].T
+    DEC = data['DEC'].T
 
-    with fits.open(os.path.join(data_dir, "DES-SN5YR_Foundation_HEAD.FITS.gz")) as hdul:
-        table_data = hdul[1].data  
-    df_found = pd.DataFrame(table_data)
+    indxs = np.where(zvec>=0.01)
+    zvec_CMB = zvec[indxs]
+    mvecc = mvec[indxs]
+    zvec_HEL = zHEL[indxs]
 
-    z_found = df_found['REDSHIFT_FINAL'].to_numpy()
-    RA_found = df_found['RA'].to_numpy()
-    DEC_found = df_found['DEC'].to_numpy()
-    vpec_found = df_found['VPEC'].to_numpy()
+    RA_vecc = RA[indxs]
+    DEC_vecc = DEC[indxs]
 
-    z_lowz = df_lowz['REDSHIFT_FINAL'].to_numpy()
-    RA_lowz = df_lowz['RA'].to_numpy()
-    DEC_lowz = df_lowz['DEC'].to_numpy()
-    VPEC_lowz = df_lowz['VPEC'].to_numpy()
+    cov_matrix_fil = cov_matrix[indxs[0],:]
+    cov_matrix_fil = cov_matrix_fil[:,indxs[0]]  # Eliminar columnas
+    cov_pan_fil = cov_matrix_fil
 
-
-    RA_test = np.zeros(len(zCMB_DES)) ; DEC_test = np.zeros(len(zCMB_DES))
-    vtest1 = np.zeros(len(zCMB_DES))  ; ztest1 = np.zeros(len(zCMB_DES))
-
-    prec_z = 1e-5 ; prec_vpec = 1
-    for i in range(len(zCMB_DES)):
-        for j in range(len(z_found)):
-            if (np.abs(zCMB_DES[i] - z_found[j])<prec_z and np.abs(data['VPEC'][i]-vpec_found[j])<prec_vpec):
-                ztest1[i] = zCMB_DES[i]
-                RA_test[i] = RA_found[j]
-                DEC_test[i] = DEC_found[j]
-
-        for j in range(len(z_lowz)):
-            if (np.abs(zCMB_DES[i] - z_lowz[j])<prec_z and np.abs(data['VPEC'][i]-VPEC_lowz[j])<prec_vpec):
-                ztest1[i] = zCMB_DES[i]
-                RA_test[i] = RA_lowz[j]
-                DEC_test[i] = DEC_lowz[j]
-
-    RA_rec = RA_DES             ;  DEC_rec = DEC_DES
-    RA_rec[RA_rec == -999] = 0  ;  DEC_rec[DEC_rec == -999] = 0
-    RA_rec += RA_test           ;  DEC_rec += DEC_test
-    # Get sorting indices
-    sorted_indices = np.argsort(zCMB_DES)
-
-    # Apply sorting to redshifts, magnitudes, and covariance matrix
-    sorted_zCMB_vec = zCMB_DES[sorted_indices]
-    sorted_mB_vec = mB_DES[sorted_indices]
-    sorted_zHEL_vec = zHEL_DES[sorted_indices]
-    sorted_RA_vec = RA_rec[sorted_indices]
-    sorted_DEC_vec = DEC_rec[sorted_indices]
-    sorted_cov_matrix = cov_mat_DES[np.ix_(sorted_indices, sorted_indices)]
-
-    RA_rad = sorted_RA_vec*np.pi/180
-    DEC_rad = sorted_DEC_vec*np.pi/180
+    RA_rad = RA_vecc*np.pi/180
+    DEC_rad = DEC_vecc*np.pi/180
     rdirs = []
-    for i in range(len(sorted_RA_vec)):
+    for i in range(len(zvec_CMB)):
         RAi = RA_rad[i] ; DECi = DEC_rad[i]
         diri = np.array([np.sin(RAi)*np.cos(DECi),np.sin(RAi)*np.sin(DECi),np.cos(RAi)])
         rdirs.append(diri)
+    return mvecc, zvec_CMB, zvec_HEL, rdirs, cov_pan_fil
 
-    return sorted_mB_vec, sorted_zCMB_vec, sorted_zHEL_vec, rdirs, sorted_cov_matrix
-#####################
-
-
-# def logprior(theta):
-#     OL, Om, Ob, sig8, h0, Mag, gamma, sigv = theta
-#     Ok = 1-Om-OL
-#     #################### priors
-#     if not (4*Ok**3 + 27*OL*Om**2 > 0): return -np.inf
-
-#     if not (-0.6<Ok<0.6)    : return -np.inf
-#     if not (0<OL<1.5)       : return -np.inf
-#     if not (Ob<Om<1.5)       : return -np.inf
-#     if not (0.005<Ob<0.2)   : return -np.inf
-#     if not (0<sig8<2)       : return -np.inf
-#     if not (0.4<h0<1)       : return -np.inf
-#     if not (-21<Mag<-18)    : return -np.inf
-#     if not (-1<gamma<3)     : return -np.inf
-#     if not (125<sigv<325)   : return -np.inf
-
-#     #### prior abs Mag
-#     Magmean = -19.253 ; sigMag = 0.029
-#     priorMag =  ((Mag-Magmean)/sigMag)**2
-#     #### prior BBN
-#     prior_bbn = ((Ob*h0*h0 - 0.02196) / 0.00063)**2
-#     return -0.5 * priorMag - 0.5 * prior_bbn
+####################
