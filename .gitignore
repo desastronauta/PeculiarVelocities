@@ -2,5 +2,6 @@
 *.slurm
 *.h5
 *.txt
-emcee/fsig8/CAMB_orig/
+CAMB_orig/
 __pycache__/
+.ipynb_checkpoints/
