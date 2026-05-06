@@ -11,67 +11,45 @@ fs8_data = {'z':[0.295,0.510,0.706,0.930,1.317,1.491],
         'fsig8_err':[0.094,0.061,0.055,0.048,0.043,0.045],
         'tracer':['BGS','LRG1','LRG2','LRG3','ELG2','QSO']}
 
-def compute_fsigma8_camb(theta_fs8, redshifts=fs8_data['z']):
-    H0, Ombh2, Ocdmh2, As, ns, Ok, gamma = theta_fs8
-    # Set up CAMB parameters
-    pars = camb.CAMBparams()
-    
-    # Set basic cosmology
-    pars.set_cosmology(H0=H0, ombh2=Ombh2, omch2=Ocdmh2, omk=Ok, gamma0=gamma, gamma1=0.0)
-    pars.InitPower.set_params(As=As, ns=ns)
+def compute_fsigma8(theta_fs8, redshifts=fs8_data['z']):
+    Om, Ok, sig8, gamma = theta_fs8
 
     z_all = np.concatenate([[0.0], redshifts])
-    sort_idx = np.argsort(z_all)[::-1]
-    z_sorted = z_all[sort_idx]
-    pars.set_matter_power(redshifts=z_sorted, kmax=10.0)
-
-    # Run CAMB
-    results = camb.get_results(pars)
     
     # --- Compute growth factor D(z) for f ---
-    # --- Create a z grid ---
+    # --- 1. Create a z grid ---
     z_dense = np.linspace(0, max(z_all), 500)
+    #z_dense = np.linspace(0, 1.5, 5000)
 
-    # --- Omega_m(z) from CAMB ---
-    H_dense = results.hubble_parameter(z_dense)
+    # --- 2. Omega_m(z) ---
+    Ez2_dense = Om * (1 + z_dense)**3 + Ok * (1 + z_dense)**2 + (1 - Om - Ok)
+    Omega_m_dense = Om * (1 + z_dense)**3 / Ez2_dense
 
-    Omega_m0 = (Ombh2 + Ocdmh2) / (H0/100.0)**2
-    Ez2_dense = (H_dense / H0)**2
-    Omega_m_dense = Omega_m0 * (1 + z_dense)**3 / Ez2_dense
-
-    # --- f(z) ---
+    # --- 3. f(z) ---
     f_dense = Omega_m_dense**gamma
 
-    # --- Cumulative integral ---
+    # --- 4. Manual cumulative integral ---
     integrand = f_dense / (1 + z_dense)
     dz = np.diff(z_dense)
     I = np.zeros_like(z_dense)
     I[1:] = np.cumsum(0.5 * (integrand[1:] + integrand[:-1]) * dz)
 
-    # --- Growth factor ---
+    # --- 5. Growth factor ---
     D_dense = np.exp(-I)
 
-    # --- sigma8 ---
-    sigma8_0 = results.get_sigma8()[-1]  # sigma8 at z=0 from CAMB
-    sigma8_dense = sigma8_0 * D_dense
+    # --- 6. sigma8 ---
+    sigma8_dense = sig8 * D_dense
 
-    # --- fsigma8 ---
+    # --- 7. fsigma8 ---
     fsigma8_dense = f_dense * sigma8_dense
 
-    # --- Interpolate ---
-    #interp_sigma8 = interp1d(z_dense, sigma8_dense, kind='cubic')
-    #interp_f = interp1d(z_dense, f_dense, kind='cubic')
+    # --- 8. Interpolate ---
     interp_fsigma8 = interp1d(z_dense, fsigma8_dense, kind='cubic')
-    #interp_Om = interp1d(z_dense, Omega_m_dense, kind='cubic')
-
-    #sigma8_final = interp_sigma8(z_all)
-    #f_final = interp_f(z_all)
     fs8 = interp_fsigma8(redshifts)
-
     return fs8
 
 def chi2_fs8(theta_fs8):
-    fs8_theory = compute_fsigma8_camb(theta_fs8)
+    fs8_theory = compute_fsigma8(theta_fs8)
     chi2 = np.sum(((fs8_data['fsig8'] - fs8_theory) / fs8_data['fsig8_err'])**2)
     return chi2
 

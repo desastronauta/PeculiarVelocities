@@ -1,3 +1,5 @@
 *.out
 *.slurm
 *.h5
+*.txt
+./emcee/fsig8/CAMB_orig
