@@ -5,3 +5,4 @@
 CAMB_orig/
 __pycache__/
 .ipynb_checkpoints/
+*.log
